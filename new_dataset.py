@@ -61,19 +61,24 @@ class NodeIterDataset(Dataset):
 
 
 class NeighborSampler(object):
-    def __init__(self, csc_graph, samples_list):
+    def __init__(self, csc_graph, samples_list, num_nodes, num_edges):
         self.csc_graph = csc_graph
         self.samples_list = samples_list
+        self.value_buffer = paddle.full([int(num_nodes)], -1, dtype="int32")
+        self.index_buffer = paddle.full([int(num_nodes)], -1, dtype="int32")
+        self.eid_perm = np.arange(0, num_edges, dtype="int64")
+        self.eid_perm = core.eager.to_uva_tensor(self.eid_perm, 0)
 
     def sample(self, nodes):
         graph_list = []
-
         for i in range(len(self.samples_list)):
             neighbors, neighbor_counts = paddle.geometric.sample_neighbors(
-                self.csc_graph[0], self.csc_graph[1], nodes, sample_size=self.samples_list[i])
+                self.csc_graph[0], self.csc_graph[1], nodes, sample_size=self.samples_list[i],
+                perm_buffer=self.eid_perm)
             edge_src, edge_dst, out_nodes = \
-                paddle.geometric.reindex_graph(nodes, neighbors, neighbor_counts)
-            graph = Graph(num_nodes=len(out_nodes), 
+                paddle.geometric.reindex_graph(nodes, neighbors, neighbor_counts,
+                self.value_buffer, self.index_buffer)
+            graph = Graph(num_nodes=len(out_nodes),
                           edges=paddle.concat([edge_src.reshape([-1, 1]),
                                                edge_dst.reshape([-1, 1]),
                                                ], axis=-1))

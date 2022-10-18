@@ -12,8 +12,10 @@ class SAGEConv(nn.Layer):
         self.aggregator = aggregator
         if aggregator is not "mean":
             raise AssertionError("aggregator %s not supported." % (aggregator,))
-        self.neigh_linear = nn.Linear(input_size, hidden_size)
-        self.self_linear = nn.Linear(input_size, hidden_size)
+        
+        self.linear = nn.Linear(input_size * 2, hidden_size)
+        # self.neigh_linear = nn.Linear(input_size, hidden_size)
+        # self.self_linear = nn.Linear(input_size, hidden_size)
         if bias:
             self.bias = \
                 paddle.create_parameter(shape=[hidden_size], 
@@ -29,8 +31,9 @@ class SAGEConv(nn.Layer):
         output = paddle.geometric.send_u_recv(x[0], src, dst, 
                                               reduce_op=self.aggregator,
                                               out_size=x[1].shape[0])
-        output = self.neigh_linear(output)
-        output += self.self_linear(x[1])
+        # output = self.neigh_linear(output)
+        # output += self.self_linear(x[1])
+        output = self.linear(paddle.concat([x[1], output], axis=1))
         if self.bias is not None:
             output = output + self.bias
         if act is not None:
